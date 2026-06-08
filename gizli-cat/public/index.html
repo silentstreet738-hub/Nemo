@@ -5,34 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nemo Çat</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e5ddd5; }
-        #chat { max-width: 500px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 80vh; display: flex; flex-direction: column; }
-        #messages { flex: 1; padding: 20px; overflow-y: auto; list-style-type: none; margin: 0; }
-        #messages li { padding: 10px 14px; margin-bottom: 8px; border-radius: 8px; background: #f1f0f0; max-width: 70%; word-break: break-all; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background: #e5ddd5; display: flex; justify-content: center; height: 95vh; box-sizing: border-box; }
+        #app-container { display: flex; width: 100%; max-width: 800px; height: 100%; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        #contacts-panel { width: 30%; background: #eee; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        #contacts-header { padding: 15px; background: #075e54; color: white; font-weight: bold; font-size: 14px; }
+        #user-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        #user-list li { padding: 12px 15px; border-bottom: 1px solid #e0e0e0; font-size: 13px; color: #333; font-weight: 500; }
+        #chat-panel { width: 70%; display: flex; flex-direction: column; background: #f8f9fa; }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; list-style-type: none; margin: 0; }
+        #messages li { padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; background: #fff; max-width: 75%; word-break: break-all; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         #messages li.self { background: #dcf8c6; margin-left: auto; }
-        .delete-btn { background: none; border: none; cursor: pointer; font-size: 14px; margin-left: 10px; opacity: 0.6; transition: opacity 0.2s; padding: 0; }
-        .delete-btn:hover { opacity: 1; }
-        #controls { display: flex; flex-direction: column; padding: 10px; border-top: 1px solid #ddd; background: #f9f9f9; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+        .sender-name { font-size: 11px; color: #128c7e; font-weight: bold; margin-bottom: 3px; }
+        .msg-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .delete-btn { background: none; border: none; cursor: pointer; font-size: 13px; margin-left: 10px; opacity: 0.5; padding: 0; }
+        #controls { display: flex; flex-direction: column; padding: 10px; border-top: 1px solid #ddd; background: #f9f9f9; }
         #form { display: flex; }
         #input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
-        #btn { padding: 10px 20px; background: #075e54; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; font-weight: bold; }
-        #timer-select { padding: 6px; margin-bottom: 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; background: white; outline: none; }
+        #btn { padding: 10px 15px; background: #075e54; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; font-weight: bold; }
+        #timer-select { padding: 6px; margin-bottom: 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; background: white; }
     </style>
 </head>
 <body>
-    <div id="chat">
-        <ul id="messages"></ul>
-        <div id="controls">
-            <select id="timer-select">
-                <option value="0">Silinmə vaxtı (Yoxdur)</option>
-                <option value="5">5 saniyə sonra sil</option>
-                <option value="10">10 saniyə sonra sil</option>
-                <option value="30">30 saniyə sonra sil</option>
-                <option value="60">1 dəqiqə sonra sil</option>
-            </select>
-            <div id="form">
-                <input id="input" autocomplete="off" placeholder="Mesaj yazın..." />
-                <button id="btn" onclick="send()">Göndər</button>
+    <div id="app-container">
+        <div id="contacts-panel">
+            <div id="contacts-header">Aktiv Şəxslər</div>
+            <ul id="user-list"></ul>
+        </div>
+        <div id="chat-panel">
+            <ul id="messages"></ul>
+            <div id="controls">
+                <select id="timer-select">
+                    <option value="0">Silinmə vaxtı (Yoxdur)</option>
+                    <option value="5">5 saniyə sonra sil</option>
+                    <option value="10">10 saniyə sonra sil</option>
+                    <option value="30">30 saniyə sonra sil</option>
+                    <option value="60">1 dəqiqə sonra sil</option>
+                </select>
+                <div id="form">
+                    <input id="input" autocomplete="off" placeholder="Mesaj yazın..." />
+                    <button id="btn" onclick="send()">Göndər</button>
+                </div>
             </div>
         </div>
     </div>
@@ -40,15 +52,19 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let myNickname = prompt("İstifadəçi adınızı daxil edin:") || "Anonim";
+        socket.emit('set nickname', myNickname);
+
         const messages = document.getElementById('messages');
         const input = document.getElementById('input');
         const timerSelect = document.getElementById('timer-select');
+        const userList = document.getElementById('user-list');
 
         function send() {
             if (input.value) {
                 const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
                 const duration = parseInt(timerSelect.value);
-                const data = { id: msgId, text: input.value, duration: duration };
+                const data = { id: msgId, text: input.value, duration: duration, sender: myNickname };
                 
                 socket.emit('chat message', data);
                 appendMessage(data, true);
@@ -63,17 +79,25 @@
             li.id = data.id;
             li.className = isSelf ? 'self' : '';
             
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'sender-name';
+            nameDiv.textContent = isSelf ? "Mən" : data.sender;
+            li.appendChild(nameDiv);
+
+            const row = document.createElement('div');
+            row.className = 'msg-row';
+
             const textSpan = document.createElement('span');
             textSpan.textContent = data.text;
-            li.appendChild(textSpan);
+            row.appendChild(textSpan);
 
             const delBtn = document.createElement('button');
             delBtn.className = 'delete-btn';
-            delBtn.innerHTML = '🗑️'; // Bura zibil qutusu emojisi yerləşdirdik
-            delBtn.title = 'Mesajı sil';
+            delBtn.innerHTML = '🗑️';
             delBtn.onclick = () => socket.emit('delete message', data.id);
-            li.appendChild(delBtn);
+            row.appendChild(delBtn);
 
+            li.appendChild(row);
             messages.appendChild(li);
             messages.scrollTop = messages.scrollHeight;
         }
@@ -90,6 +114,15 @@
         socket.on('message deleted', (msgId) => {
             const el = document.getElementById(msgId);
             if (el) el.remove();
+        });
+
+        socket.on('user list', (users) => {
+            userList.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = '🟢 ' + user;
+                userList.appendChild(li);
+            });
         });
     </script>
 </body>

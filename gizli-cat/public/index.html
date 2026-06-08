@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nemo Çat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e5ddd5; }
+        #chat { max-width: 500px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 80vh; display: flex; flex-direction: column; }
+        #messages { flex: 1; padding: 20px; overflow-y: auto; list-style-type: none; margin: 0; }
+        #messages li { padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; background: #f1f0f0; max-width: 70%; word-break: break-all; }
+        #messages li.self { background: #dcf8c6; margin-left: auto; }
+        #form { display: flex; padding: 10px; border-top: 1px solid #ddd; }
+        #input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
+        #btn { padding: 10px 20px; background: #075e54; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="chat">
+        <ul id="messages"></ul>
+        <div id="form">
+            <input id="input" autocomplete="off" placeholder="Mesaj yazın..." /><button id="btn" onclick="send()">Göndər</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const messages = document.getElementById('messages');
+        const input = document.getElementById('input');
+
+        function send() {
+            if (input.value) {
+                socket.emit('chat message', input.value);
+                const li = document.createElement('li');
+                li.textContent = input.value;
+                li.className = 'self';
+                messages.appendChild(li);
+                input.value = '';
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+
+        socket.on('chat message', (msg) => {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            messages.appendChild(li);
+            messages.scrollTop = messages.scrollHeight;
+        });
+    </script>
+</body>
+</html>

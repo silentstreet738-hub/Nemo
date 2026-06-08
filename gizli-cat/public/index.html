@@ -19,10 +19,14 @@
         .msg-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .delete-btn { background: none; border: none; cursor: pointer; font-size: 13px; margin-left: 10px; opacity: 0.5; padding: 0; }
         #controls { display: flex; flex-direction: column; padding: 10px; border-top: 1px solid #ddd; background: #f9f9f9; }
-        #form { display: flex; }
+        #form { display: flex; align-items: center; }
         #input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
         #btn { padding: 10px 15px; background: #075e54; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; font-weight: bold; }
+        #audio-btn { padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; font-size: 16px; }
+        #audio-btn.recording { background: #dc3545; animation: pulse 1s infinite; }
         #timer-select { padding: 6px; margin-bottom: 6px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; background: white; }
+        audio { max-width: 100%; margin-top: 5px; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -44,6 +48,7 @@
                 <div id="form">
                     <input id="input" autocomplete="off" placeholder="Mesaj yazın..." />
                     <button id="btn" onclick="send()">Göndər</button>
+                    <button id="audio-btn" onclick="toggleRecording()">🎤</button>
                 </div>
             </div>
         </div>
@@ -59,18 +64,62 @@
         const input = document.getElementById('input');
         const timerSelect = document.getElementById('timer-select');
         const userList = document.getElementById('user-list');
+        const audioBtn = document.getElementById('audio-btn');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
 
         function send() {
             if (input.value) {
                 const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
                 const duration = parseInt(timerSelect.value);
-                const data = { id: msgId, text: input.value, duration: duration, sender: myNickname };
+                const data = { id: msgId, text: input.value, type: 'text', duration: duration, sender: myNickname };
                 
                 socket.emit('chat message', data);
                 appendMessage(data, true);
                 input.value = '';
-                
                 if (duration > 0) startTimer(msgId, duration);
+            }
+        }
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert("Brauzeriniz səs yazmağı dəstəkləmir.");
+                    return;
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        const base64Audio = reader.result;
+                        const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
+                        const duration = parseInt(timerSelect.value);
+                        const data = { id: msgId, audio: base64Audio, type: 'audio', duration: duration, sender: myNickname };
+                        
+                        socket.emit('chat message', data);
+                        appendMessage(data, true);
+                        if (duration > 0) startTimer(msgId, duration);
+                    };
+                };
+
+                mediaRecorder.start();
+                audioBtn.classList.add('recording');
+                audioBtn.textContent = '🛑';
+                isRecording = true;
+            } else {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                audioBtn.classList.remove('recording');
+                audioBtn.textContent = '🎤';
+                isRecording = false;
             }
         }
 
@@ -87,9 +136,16 @@
             const row = document.createElement('div');
             row.className = 'msg-row';
 
-            const textSpan = document.createElement('span');
-            textSpan.textContent = data.text;
-            row.appendChild(textSpan);
+            if (data.type === 'audio') {
+                const audio = document.createElement('audio');
+                audio.src = data.audio;
+                audio.controls = true;
+                row.appendChild(audio);
+            } else {
+                const textSpan = document.createElement('span');
+                textSpan.textContent = data.text;
+                row.appendChild(textSpan);
+            }
 
             const delBtn = document.createElement('button');
             delBtn.className = 'delete-btn';

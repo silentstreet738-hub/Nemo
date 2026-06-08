@@ -9,8 +9,15 @@ const io = new Server(server);
 app.use(express.static(__dirname + '/public'));
 
 io.on('connection', (socket) => {
-    socket.on('chat message', (msg) => {
-        socket.broadcast.emit('chat message', msg);
+    // Mesaj göndəriləndə
+    socket.on('chat message', (data) => {
+        // Gələn mesajı digər istifadəçilərə ID və taymer vaxtı ilə birlikdə ötürür
+        socket.broadcast.emit('chat message', data);
+    });
+
+    // Mesaj silinəndə
+    socket.on('delete message', (msgId) => {
+        io.emit('message deleted', msgId);
     });
 });
 

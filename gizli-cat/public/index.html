@@ -8,18 +8,31 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e5ddd5; }
         #chat { max-width: 500px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 80vh; display: flex; flex-direction: column; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; list-style-type: none; margin: 0; }
-        #messages li { padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; background: #f1f0f0; max-width: 70%; word-break: break-all; }
+        #messages li { padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; background: #f1f0f0; max-width: 70%; word-break: break-all; display: flex; justify-content: space-between; align-items: center; }
         #messages li.self { background: #dcf8c6; margin-left: auto; }
-        #form { display: flex; padding: 10px; border-top: 1px solid #ddd; }
+        .delete-btn { background: none; border: none; color: #ff5c5c; cursor: pointer; font-size: 12px; margin-left: 10px; font-weight: bold; }
+        #controls { display: flex; flex-direction: column; padding: 10px; border-top: 1px solid #ddd; background: #f9f9f9; }
+        #form { display: flex; }
         #input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
         #btn { padding: 10px 20px; background: #075e54; color: white; border: none; border-radius: 4px; margin-left: 5px; cursor: pointer; }
+        #timer-select { padding: 5px; margin-bottom: 5px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; }
     </style>
 </head>
 <body>
     <div id="chat">
         <ul id="messages"></ul>
-        <div id="form">
-            <input id="input" autocomplete="off" placeholder="Mesaj yazın..." /><button id="btn" onclick="send()">Göndər</button>
+        <div id="controls">
+            <select id="timer-select">
+                <option value="0">Silinmə vaxtı (Yoxdur)</option>
+                <option value="5">5 saniyə sonra sil</option>
+                <option value="10">10 saniyə sonra sil</option>
+                <option value="30">30 saniyə sonra sil</option>
+                <option value="60">1 dəqiqə sonra sil</option>
+            </select>
+            <div id="form">
+                <input id="input" autocomplete="off" placeholder="Mesaj yazın..." />
+                <button id="btn" onclick="send()">Göndər</button>
+            </div>
         </div>
     </div>
 
@@ -28,24 +41,53 @@
         const socket = io();
         const messages = document.getElementById('messages');
         const input = document.getElementById('input');
+        const timerSelect = document.getElementById('timer-select');
 
         function send() {
             if (input.value) {
-                socket.emit('chat message', input.value);
-                const li = document.createElement('li');
-                li.textContent = input.value;
-                li.className = 'self';
-                messages.appendChild(li);
+                const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
+                const duration = parseInt(timerSelect.value);
+                const data = { id: msgId, text: input.value, duration: duration };
+                
+                socket.emit('chat message', data);
+                appendMessage(data, true);
                 input.value = '';
-                messages.scrollTop = messages.scrollHeight;
+                
+                if (duration > 0) startTimer(msgId, duration);
             }
         }
 
-        socket.on('chat message', (msg) => {
+        function appendMessage(data, isSelf) {
             const li = document.createElement('li');
-            li.textContent = msg;
+            li.id = data.id;
+            li.className = isSelf ? 'self' : '';
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = data.text;
+            li.appendChild(textSpan);
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delete-btn';
+            delBtn.textContent = 'X';
+            delBtn.onclick = () => socket.emit('delete message', data.id);
+            li.appendChild(delBtn);
+
             messages.appendChild(li);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        function startTimer(msgId, seconds) {
+            setTimeout(() => { socket.emit('delete message', msgId); }, seconds * 1000);
+        }
+
+        socket.on('chat message', (data) => {
+            appendMessage(data, false);
+            if (data.duration > 0) startTimer(data.id, data.duration);
+        });
+
+        socket.on('message deleted', (msgId) => {
+            const el = document.getElementById(msgId);
+            if (el) el.remove();
         });
     </script>
 </body>

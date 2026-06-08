@@ -4,7 +4,6 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-// Səs ötürülməsi zamanı kəsinti olmaması üçün maksimum paket ölçüsünü artırırıq
 const io = new Server(server, {
     maxHttpBufferSize: 1e7
 });
@@ -16,7 +15,7 @@ const users = {};
 io.on('connection', (socket) => {
     socket.on('set nickname', (nickname) => {
         users[socket.id] = nickname || 'Anonim';
-        io.emit('user list', Object.values(users));
+        io.emit('user list', Object.keys(users).map(id => ({ id, name: users[id] })));
     });
 
     socket.on('chat message', (data) => {
@@ -28,9 +27,29 @@ io.on('connection', (socket) => {
         io.emit('message deleted', msgId);
     });
 
+    // WebRTC Siqnal mexanizmi (Zənglər üçün)
+    socket.on('call-user', (data) => {
+        socket.to(data.to).emit('call-made', {
+            offer: data.offer,
+            socket: socket.id,
+            sender: users[socket.id]
+        });
+    });
+
+    socket.on('make-answer', (data) => {
+        socket.to(data.to).emit('answer-made', {
+            socket: socket.id,
+            answer: data.answer
+        });
+    });
+
+    socket.on('ice-candidate', (data) => {
+        socket.to(data.to).emit('ice-candidate', data.candidate);
+    });
+
     socket.on('disconnect', () => {
         delete users[socket.id];
-        io.emit('user list', Object.values(users));
+        io.emit('user list', Object.keys(users).map(id => ({ id, name: users[id] })));
     });
 });
 
